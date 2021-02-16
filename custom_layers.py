@@ -10,9 +10,9 @@ class MaxPoolingWithArgmax2D(Layer):
             padding='valid',
             **kwargs):
         super().__init__()
-        self.padding = padding
         self.pool_size = pool_size
         self.strides = strides
+        self.padding = padding
 
     def call(self, inputs, **kwargs):
         padding = self.padding
@@ -49,7 +49,7 @@ class MaxPoolingWithArgmax2D(Layer):
             'pool_size': self.pool_size,
             'strides': self.strides,
         })
-        return config    
+        return config
 
 # class MaxUnpooling2D(Layer):
 #     def __init__(self, pool_size=(2, 2), out_shape=None, **kwargs):
@@ -114,9 +114,9 @@ class MaxPoolingWithArgmax2D(Layer):
 
 
 class MaxUnpooling2D(Layer):
-    def __init__(self, size=(2, 2), out_shape=None, **kwargs):
+    def __init__(self, pool_size=(2, 2), out_shape=None, **kwargs):
         super().__init__()
-        self.size = size
+        self.pool_size = pool_size
         self.out_shape = out_shape
 
     def call(self, inputs):
@@ -127,8 +127,8 @@ class MaxUnpooling2D(Layer):
         if self.out_shape is None:
             out_shape = (
                 input_shape[0],
-                input_shape[1] * self.size[0],
-                input_shape[2] * self.size[1],
+                input_shape[1] * self.pool_size[0],
+                input_shape[2] * self.pool_size[1],
                 input_shape[3])
         else:
             out_shape = (
@@ -145,8 +145,8 @@ class MaxUnpooling2D(Layer):
         input_shape = updates.shape
         if self.out_shape is None:
             out_shape = [-1,
-                        input_shape[1] * self.size[0],
-                        input_shape[2] * self.size[1],
+                        input_shape[1] * self.pool_size[0],
+                        input_shape[2] * self.pool_size[1],
                         input_shape[3]]
         else:
             out_shape = [
@@ -163,8 +163,8 @@ class MaxUnpooling2D(Layer):
         if self.out_shape is None:
             return (
                     mask_shape[0],
-                    mask_shape[1]*self.size[0],
-                    mask_shape[2]*self.size[1],
+                    mask_shape[1]*self.pool_size[0],
+                    mask_shape[2]*self.pool_size[1],
                     mask_shape[3]
                     )
         else:
@@ -174,3 +174,11 @@ class MaxUnpooling2D(Layer):
                 self.out_shape[2],
                 self.out_shape[3],
             )
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'pool_size': self.pool_size,
+            'out_shape': self.out_shape,
+        })
+        return config

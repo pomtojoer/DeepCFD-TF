@@ -11,10 +11,11 @@ from custom_layers import MaxPoolingWithArgmax2D, MaxUnpooling2D
 
 def deepcfd(input_height, input_width, input_channels,
             weight_decay, learning_rate):
+
     # Shared encoder channel
     inputs = Input(shape=(input_height, input_width, input_channels))
 
-    conv1a = Conv2D(8, (5,5), activation='relu', padding='same')(inputs)
+    conv1a = Conv2D(8, (5,5), activation='relu', padding='same', name='block1_layer1_conv2d')(inputs)
     conv1b = Conv2D(8, (5,5), activation='relu', padding='same')(conv1a)
     # pool1 = MaxPooling2D((2,2))(conv1b)
     pool1, idx1 = MaxPoolingWithArgmax2D(pool_size=(2, 2))(conv1b)
@@ -57,7 +58,7 @@ def deepcfd(input_height, input_width, input_channels,
     unpool1_ux = MaxUnpooling2D(pool_size=(2, 2), out_shape=conv1b.shape)([deconv2b_ux, idx1])
     concat1_ux = Concatenate()([conv1b, unpool1_ux])
     deconv1a_ux = Conv2DTranspose(8, (5,5), activation='relu', padding='same')(concat1_ux)
-    deconv1b_ux = Conv2DTranspose(1, (5,5), padding='same')(deconv1a_ux)
+    deconv1b_ux = Conv2DTranspose(1, (5,5), padding='same', name='ux')(deconv1a_ux)
 
     # Separate Uy decoder channel
     # upsamp4_uy = UpSampling2D((2,2))(pool4)
@@ -82,46 +83,58 @@ def deepcfd(input_height, input_width, input_channels,
     unpool1_uy = MaxUnpooling2D(pool_size=(2, 2), out_shape=conv1b.shape)([deconv2b_uy, idx1])
     concat1_uy = Concatenate()([conv1b, unpool1_uy])
     deconv1a_uy = Conv2DTranspose(8, (5,5), activation='relu', padding='same')(concat1_uy)
-    deconv1b_uy = Conv2DTranspose(1, (5,5), padding='same')(deconv1a_uy)
+    deconv1b_uy = Conv2DTranspose(1, (5,5), padding='same', name='uy')(deconv1a_uy)
    
     # Separate p decoder channel
-    # upsamp4_uy = UpSampling2D((2,2))(pool4)
-    # unpool4_uy = MaxUnpooling2D(pool_size=(2, 2), out_shape=conv4b.shape)([pool4, idx4])
+    # upsamp4_p = UpSampling2D((2,2))(pool4)
+    # unpool4_p = MaxUnpooling2D(pool_size=(2, 2), out_shape=conv4b.shape)([pool4, idx4])
     concat4_p = Concatenate()([conv4a, conv4b])
     deconv4a_p = Conv2DTranspose(32, (5,5), activation='relu', padding='same')(concat4_p)
     deconv4b_p = Conv2DTranspose(32, (5,5), activation='relu', padding='same')(deconv4a_p)
 
-    # upsamp3_uy = UpSampling2D((2,2))(deconv4b_uy)
+    # upsamp3_p = UpSampling2D((2,2))(deconv4b_p)
     unpool3_p = MaxUnpooling2D(pool_size=(2, 2), out_shape=conv3b.shape)([deconv4b_p, idx3])
     concat3_p = Concatenate()([conv3b, unpool3_p])
     deconv3a_p = Conv2DTranspose(32, (5,5), activation='relu', padding='same')(concat3_p)
     deconv3b_p = Conv2DTranspose(16, (5,5), activation='relu', padding='same')(deconv3a_p)
 
-    # upsamp2_uy = UpSampling2D((2,2))(deconv3b_uy)
+    # upsamp2_p = UpSampling2D((2,2))(deconv3b_p)
     unpool2_p = MaxUnpooling2D(pool_size=(2, 2), out_shape=conv2b.shape)([deconv3b_p, idx2])
     concat2_p = Concatenate()([conv2b, unpool2_p])
     deconv2a_p = Conv2DTranspose(16, (5,5), activation='relu', padding='same')(concat2_p)
     deconv2b_p = Conv2DTranspose(8, (5,5), activation='relu', padding='same')(deconv2a_p)
 
-    # upsamp1_uy = UpSampling2D((2,2))(deconv2b_uy)
+    # upsamp1_p = UpSampling2D((2,2))(deconv2b_p)
     unpool1_p = MaxUnpooling2D(pool_size=(2, 2), out_shape=conv1b.shape)([deconv2b_p, idx1])
     concat1_p = Concatenate()([conv1b, unpool1_p])
     deconv1a_p = Conv2DTranspose(8, (5,5), activation='relu', padding='same')(concat1_p)
-    deconv1b_p = Conv2DTranspose(1, (5,5), padding='same')(deconv1a_p)
+    deconv1b_p = Conv2DTranspose(1, (5,5), padding='same', name='p')(deconv1a_p)
 
     # # Creating Model
-    model = Model(inputs=[inputs], outputs=[deconv1b_ux,deconv1b_uy,deconv1b_p])
+    model = Model(
+        inputs=[inputs],
+        outputs=[deconv1b_ux,deconv1b_uy,deconv1b_p],
+        name='DeepCFD'
+    )
 
     # Creating optimiser
     optimiser = AdamW(weight_decay, learning_rate)
 
-    # creating metrics
-    metrics = ['acc',]
+    # Creating metrics
+    metrics = {
+        'ux': ['acc', 'mse'],
+        'uy': ['acc', 'mse'],
+        'p': ['acc', 'mse']
+    }
 
-    # creating separate losses
-    losses = [MeanSquaredError(), MeanSquaredError(), MeanAbsoluteError()]
+    # Creating separate losses
+    losses = {
+        'ux': MeanSquaredError(),
+        'uy': MeanSquaredError(),
+        'p': MeanAbsoluteError()
+    }
 
     # Compiling model
-    model.compile(optimizer="adam", loss=losses, metrics=metrics)
+    model.compile(optimizer=optimiser, loss=losses, metrics=metrics)
 
     return model
